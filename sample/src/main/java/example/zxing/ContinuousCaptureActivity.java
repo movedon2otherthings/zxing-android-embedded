@@ -14,6 +14,10 @@ import com.journeyapps.barcodescanner.BarcodeCallback;
 import com.journeyapps.barcodescanner.BarcodeResult;
 import com.journeyapps.barcodescanner.CompoundBarcodeView;
 
+import java.math.BigInteger;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.Arrays;
 import java.util.List;
 
 /**
@@ -24,12 +28,176 @@ public class ContinuousCaptureActivity extends Activity {
     private static final String TAG = ContinuousCaptureActivity.class.getSimpleName();
     private CompoundBarcodeView barcodeView;
 
+
+    public static class Base58check {
+        public final static String ALPHABET = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
+        private static final BigInteger BASE = BigInteger.valueOf(58);
+        /**
+         */
+        public static byte[] doubleDigest(byte[] input) {
+            return doubleDigest(input, 0, input.length);
+        }
+
+        /**
+         * Calculates the SHA-256 hash of the given byte range, and then hashes the resulting hash again. This is
+         * standard procedure in BitCoin. The resulting hash is in big endian form.
+         */
+        public static byte[] doubleDigest(byte[] input, int offset, int length) {
+            try {
+                MessageDigest digest = MessageDigest.getInstance("SHA-256");
+                digest.update(input, offset, length);
+                byte[] first = digest.digest();
+                return digest.digest(first);
+            } catch (NoSuchAlgorithmException e) {
+                throw new RuntimeException(e);  // Cannot happen.
+            }
+        }
+
+        public static BigInteger decodeToBigInteger(String input) throws IllegalArgumentException {
+            BigInteger bi = BigInteger.valueOf(0);
+            // Work backwards through the string.
+            for (int i = input.length() - 1; i >= 0; i--) {
+                int alphaIndex = ALPHABET.indexOf(input.charAt(i));
+                if (alphaIndex == -1) {
+                    throw  new  IllegalArgumentException("Illegal character " + input.charAt(i) + " at " + i);
+                }
+                bi = bi.add(BigInteger.valueOf(alphaIndex).multiply(BASE.pow(input.length() - 1 - i)));
+            }
+            return bi;
+        }
+
+        public static byte[] decode(String input) throws IllegalArgumentException {
+            byte[] bytes = decodeToBigInteger(input).toByteArray();
+            // We may have got one more byte than we wanted, if the high bit of the next-to-last byte was not zero. This
+            // is because BigIntegers are represented with twos-compliment notation, thus if the high bit of the last
+            // byte happens to be 1 another 8 zero bits will be added to ensure the number parses as positive. Detect
+            // that case here and chop it off.
+            boolean stripSignByte = bytes.length > 1 && bytes[0] == 0 && bytes[1] < 0;
+            // Count the leading zeros, if any.
+            int leadingZeros = 0;
+            for (int i = 0; input.charAt(i) == ALPHABET.charAt(0); i++) {
+                leadingZeros++;
+            }
+            // Now cut/pad correctly. Java 6 has a convenience for this, but Android can't use it.
+            byte[] tmp = new byte[bytes.length - (stripSignByte ? 1 : 0) + leadingZeros];
+            System.arraycopy(bytes, stripSignByte ? 1 : 0, tmp, leadingZeros, tmp.length - leadingZeros);
+            return tmp;
+        }
+
+        /**
+         * Uses the checksum in the last 4 bytes of the decoded data to verify the rest are correct. The checksum is
+         * removed from the returned data.
+         *
+         */
+        public static byte[] decodeChecked(String input) throws IllegalArgumentException {
+            byte[] tmp = decode(input);
+            if (tmp.length < 4)
+                throw new IllegalArgumentException("Input too short");
+            byte[] checksum = new byte[4];
+            System.arraycopy(tmp, tmp.length - 4, checksum, 0, 4);
+            byte[] bytes = new byte[tmp.length - 4];
+            System.arraycopy(tmp, 0, bytes, 0, tmp.length - 4);
+            tmp = doubleDigest(bytes);
+            byte[] hash = new byte[4];
+            System.arraycopy(tmp, 0, hash, 0, 4);
+            if (!Arrays.equals(hash, checksum))
+                throw new IllegalArgumentException("Checksum does not validate");
+            return bytes;
+        }
+    };
+
     private BarcodeCallback callback = new BarcodeCallback() {
+
+
+
+
+        String correct = "";
+        //private int buffered_scan_result[] = new int[1972];
         @Override
         public void barcodeResult(BarcodeResult result) {
             if (result.getText() != null) {
-                barcodeView.setStatusText(result.getText());
+                String text = result.getText();
+                String res = "";
+
+
+
+
+                // fix crashes
+  //              while (text.length() < 34) {
+  //                  return;
+   //             }
+
+                // fix-non-coin-address
+                if (text.charAt(0) != '1') {
+                    return;
+                }
+
+
+
+                // fix-non-coin-end
+            //    if (text.charAt(33) != 'b') {
+           //         return;
+            //    }
+
+                try {
+                    Base58check.decodeChecked(text.trim());
+
+                    correct = text;
+                } catch (IllegalArgumentException e) {
+                    res = text;
+
+                };
+
+                if (correct.length()>0)
+                    res="CORRECT: " + correct;
+
+
+                /*
+
+
+                final String base58 = Base58check.ALPHABET;
+
+
+
+                /// for each char of scan result
+                for (int i = 0; i < 34; i++) {
+
+                    char c = text.charAt(i);
+                    int j;
+
+                    if (c < '=') {
+                        j = c - '1';
+                    } else if (c > '_') {
+                        j = 24 + 9 + c - 'a';
+
+                    } else {
+                        j = 9 + c - 'A';
+
+                    }
+                    // v j-cku mam 0 az 57
+
+                    buffered_scan_result[j + i*58]++;
+
+                    j =  0;
+
+                    for (int k = 0; k < 58; k++) {
+
+                        if (buffered_scan_result[j + i*58] < buffered_scan_result[k + i*58]) {
+                            j = k;
+                        }
+                    }
+
+                    res += base58.charAt(j);
+
+                }
+*/
+
+                barcodeView.setStatusText( res);
+
             }
+
+
+
             //Added preview of scanned barcode
             ImageView imageView = (ImageView) findViewById(R.id.barcodePreview);
             imageView.setImageBitmap(result.getBitmapWithResultPoints(Color.YELLOW));
