@@ -1,6 +1,8 @@
 package com.journeyapps.barcodescanner;
 
+import com.google.zxing.BarcodeFormat;
 import com.google.zxing.BinaryBitmap;
+import com.google.zxing.DecodeHintType;
 import com.google.zxing.LuminanceSource;
 import com.google.zxing.MultiFormatReader;
 import com.google.zxing.Reader;
@@ -8,9 +10,12 @@ import com.google.zxing.Result;
 import com.google.zxing.ResultPoint;
 import com.google.zxing.ResultPointCallback;
 import com.google.zxing.common.HybridBinarizer;
+import com.journeyapps.barcodescanner.camera.TOCodeReader;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * A class for decoding images.
@@ -70,12 +75,31 @@ public class Decoder implements ResultPointCallback {
     protected Result decode(BinaryBitmap bitmap) {
         possibleResultPoints.clear();
         try {
-            if (reader instanceof MultiFormatReader) {
+            Result have = null;
+
+            if (true) {
+                Map<DecodeHintType, Object> hints = new HashMap<DecodeHintType, Object>();;
+                have = new TOCodeReader().decode(bitmap,
+                        hints);
+
+            } else if (reader instanceof MultiFormatReader) {
                 // Optimization - MultiFormatReader's normal decode() method is slow.
-                return ((MultiFormatReader) reader).decodeWithState(bitmap);
+                have = ((MultiFormatReader) reader).decodeWithState(bitmap);
             } else {
-                return reader.decode(bitmap);
+                have = reader.decode(bitmap);
+
             }
+            if (have == null){
+
+
+                ResultPoint l = new ResultPoint(196,104);
+                ResultPoint r = new ResultPoint(196,104);
+
+                have = new Result("hi",null, new ResultPoint[]{l,r}, BarcodeFormat.UPC_E,56135);
+            }
+
+            return have;
+
         } catch (Exception e) {
             // Decode error, try again next frame
             return null;
