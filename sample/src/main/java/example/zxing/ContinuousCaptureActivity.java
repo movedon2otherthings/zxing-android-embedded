@@ -1,8 +1,10 @@
 package example.zxing;
 
 import android.app.Activity;
+import android.content.Intent;
 import android.content.res.Configuration;
 import android.graphics.Color;
+import android.net.Uri;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.KeyEvent;
@@ -39,8 +41,7 @@ public class ContinuousCaptureActivity extends Activity {
         }
 
         /**
-         * Calculates the SHA-256 hash of the given byte range, and then hashes the resulting hash again. This is
-         * standard procedure in BitCoin. The resulting hash is in big endian form.
+         * Calculates the SHA-256 hash of the given byte range, and then hashes the resulting hash again.
          */
         public static byte[] doubleDigest(byte[] input, int offset, int length) {
             try {
@@ -107,11 +108,8 @@ public class ContinuousCaptureActivity extends Activity {
     };
 
     private BarcodeCallback callback = new BarcodeCallback() {
-
-
-
-
         String correct = "";
+
         //private int buffered_scan_result[] = new int[1972];
         @Override
         public void barcodeResult(BarcodeResult result) {
@@ -121,16 +119,18 @@ public class ContinuousCaptureActivity extends Activity {
 
 
 
-
                 // fix crashes
   //              while (text.length() < 34) {
   //                  return;
    //             }
 
-                // fix-non-coin-address
-                if (text.charAt(0) != '1') {
-                    return;
+                char first = text.charAt(0);
+
+                // skip non-coin
+                if ((first != '1') &&(first != 'L') &&(first != 'D')) {
+                   return;
                 }
+
 
 
 
@@ -148,49 +148,32 @@ public class ContinuousCaptureActivity extends Activity {
 
                 };
 
-                if (correct.length()>0)
-                    res="CORRECT: " + correct;
+                if (correct.length()>0) {
+                    res = "CORRECT: " + correct;
 
 
-                /*
+                    // while we're here, we can aswell to activate the uri
+                    String url = "";
 
-
-                final String base58 = Base58check.ALPHABET;
-
-
-
-                /// for each char of scan result
-                for (int i = 0; i < 34; i++) {
-
-                    char c = text.charAt(i);
-                    int j;
-
-                    if (c < '=') {
-                        j = c - '1';
-                    } else if (c > '_') {
-                        j = 24 + 9 + c - 'a';
-
-                    } else {
-                        j = 9 + c - 'A';
-
+                    if (first == '1') {
+                        url = "bitc"+"oin:" + correct;
                     }
-                    // v j-cku mam 0 az 57
-
-                    buffered_scan_result[j + i*58]++;
-
-                    j =  0;
-
-                    for (int k = 0; k < 58; k++) {
-
-                        if (buffered_scan_result[j + i*58] < buffered_scan_result[k + i*58]) {
-                            j = k;
-                        }
+                    if (first == 'L') {
+                        url = "litec"+"oin:" + correct;
                     }
-
-                    res += base58.charAt(j);
+                    if (first == 'D') {
+                        url = "dogec"+"oin:" + correct;
+                    }
+                    Intent i = new Intent(Intent.ACTION_VIEW);
+                    i.setData(Uri.parse(url));
+//                    sendBroadcast( i );
+                    try {
+                        startActivity(i);
+                    } catch (android.content.ActivityNotFoundException e) {
+                        // do nothing
+                    }
 
                 }
-*/
 
                 barcodeView.setStatusText( res);
 
